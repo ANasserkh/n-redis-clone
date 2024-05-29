@@ -2,8 +2,9 @@ use crate::command::Command;
 
 pub fn decode(command: &String) -> Result<Command, anyhow::Error> {
     let crlf = "\r\n";
-    let rest = command.split("$").last().unwrap();
-    let mut iter = rest.split(crlf).filter(|l| l.len() > 0);
+    let mut iter = command
+        .split(crlf)
+        .filter(|l| l.len() > 0 && !l.starts_with("$"));
     let _ = iter.next();
     let data = iter.collect::<Vec<&str>>();
 
@@ -30,5 +31,13 @@ pub mod tests {
 
         assert_eq!(result.name, "PING");
         assert_eq!(result.args[0], "Message");
+    }
+
+    #[test]
+    fn test_decode_echo() {
+        let result = decode(&"*2\r\n$4\r\nECHO\r\n$3\r\nhey\r\n".to_string()).unwrap();
+
+        assert_eq!(result.name, "ECHO");
+        assert_eq!(result.args[0], "hey");
     }
 }

@@ -34,11 +34,13 @@ fn handle_connection(mut stream: TcpStream) {
     loop {
         match stream.read(&mut buf) {
             Ok(len) => {
-                let req = String::from_utf8(buf[0..len].to_vec()).unwrap();
-                let _ = match handle_command(req) {
-                    Ok(i) => stream.write_all(i.as_bytes()),
-                    Err(err) => stream.write_all(err.to_string().as_bytes()),
-                };
+                if len > 0 {
+                    let req = String::from_utf8(buf[0..len].to_vec()).unwrap();
+                    let _ = match handle_command(req) {
+                        Ok(i) => stream.write_all(i.as_bytes()),
+                        Err(err) => stream.write_all(err.to_string().as_bytes()),
+                    };
+                }
             }
             Err(_) => break,
         }

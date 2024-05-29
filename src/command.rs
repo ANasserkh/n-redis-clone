@@ -10,7 +10,7 @@ impl Command {
         match self.name.to_lowercase().as_str() {
             "ping" => Ok(self.ping_command()),
             "echo" => Ok(self.echo_command()),
-            _ => return Err(anyhow!("Command is not recognized {:?}", self.name)),
+            _ => return Err(anyhow!("Command is not recognized {}", self.name)),
         }
     }
 
