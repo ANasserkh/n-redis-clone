@@ -9,6 +9,7 @@ mod command;
 mod thread_pool;
 mod resp {
     pub mod decoder;
+    pub mod encoder;
 }
 fn main() {
     println!("Logs from your program will appear here!");
