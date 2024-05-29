@@ -1,9 +1,13 @@
+use lazy_static::lazy_static;
 use resp::decoder::decode;
 use std::{
+    collections::HashMap,
     io::{Read, Write},
     net::{TcpListener, TcpStream},
+    sync::Mutex,
     vec,
 };
+
 use thread_pool::ThreadPool;
 mod command;
 mod thread_pool;
@@ -11,12 +15,15 @@ mod resp {
     pub mod decoder;
     pub mod encoder;
 }
+
+lazy_static! {
+    static ref DB: Mutex<HashMap<String, String>> = Mutex::new(HashMap::<String, String>::new());
+}
 fn main() {
     println!("Logs from your program will appear here!");
 
     let listener = TcpListener::bind("127.0.0.1:6379").unwrap();
     let pool = ThreadPool::new(8);
-
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
@@ -36,7 +43,8 @@ fn handle_connection(mut stream: TcpStream) {
             Ok(len) => {
                 if len > 0 {
                     let req = String::from_utf8(buf[0..len].to_vec()).unwrap();
-                    let _ = match handle_command(req) {
+
+                    let _ = match handle_command(req, DB.lock().unwrap()) {
                         Ok(i) => stream.write_all(i.as_bytes()),
                         Err(err) => stream.write_all(err.to_string().as_bytes()),
                     };
@@ -47,7 +55,10 @@ fn handle_connection(mut stream: TcpStream) {
     }
 }
 
-fn handle_command(req: String) -> Result<String, anyhow::Error> {
+fn handle_command(
+    req: String,
+    db: std::sync::MutexGuard<HashMap<String, String>>,
+) -> Result<String, anyhow::Error> {
     let cmd = decode(&req)?;
-    cmd.execute()
+    cmd.execute(db)
 }
