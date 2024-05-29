@@ -8,6 +8,7 @@ use std::{
     vec,
 };
 
+use chrono::{DateTime, Utc};
 use thread_pool::ThreadPool;
 mod command;
 mod thread_pool;
@@ -16,8 +17,13 @@ mod resp {
     pub mod encoder;
 }
 
+pub struct Value {
+    pub val: String,
+    pub expire_at: Option<DateTime<Utc>>,
+}
+
 lazy_static! {
-    static ref DB: Mutex<HashMap<String, String>> = Mutex::new(HashMap::<String, String>::new());
+    static ref DB: Mutex<HashMap<String, Value>> = Mutex::new(HashMap::<String, Value>::new());
 }
 fn main() {
     println!("Logs from your program will appear here!");
@@ -57,7 +63,7 @@ fn handle_connection(mut stream: TcpStream) {
 
 fn handle_command(
     req: String,
-    db: std::sync::MutexGuard<HashMap<String, String>>,
+    db: std::sync::MutexGuard<HashMap<String, Value>>,
 ) -> Result<String, anyhow::Error> {
     let cmd = decode(&req)?;
     cmd.execute(db)
