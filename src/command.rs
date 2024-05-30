@@ -1,9 +1,8 @@
-use chrono::{DateTime, Duration, Utc};
-use std::collections::HashMap;
+use chrono::{Duration, Utc};
 
 use crate::{
-    resp::encoder::{null_bulk_string_encode, simple_string_encode},
-    Value,
+    database::{Database, Value},
+    resp::encoder::{array_string_encode, null_bulk_string_encode, simple_string_encode},
 };
 use anyhow::anyhow;
 pub struct Command {
@@ -12,15 +11,13 @@ pub struct Command {
 }
 
 impl Command {
-    pub fn execute(
-        &self,
-        db: std::sync::MutexGuard<HashMap<String, Value>>,
-    ) -> Result<String, anyhow::Error> {
+    pub fn execute(&self, db: std::sync::MutexGuard<Database>) -> Result<String, anyhow::Error> {
         match self.name.to_lowercase().as_str() {
             "ping" => Ok(self.ping_command()),
             "echo" => Ok(self.echo_command()),
             "set" => Ok(self.set_command(db)),
             "get" => Ok(self.get_command(db)),
+            "config" => Ok(self.config_command(db)),
             _ => return Err(anyhow!("Command is not recognized {}", self.name)),
         }
     }
@@ -33,7 +30,7 @@ impl Command {
         simple_string_encode(&self.args.join(" "))
     }
 
-    fn set_command(&self, mut db: std::sync::MutexGuard<HashMap<String, Value>>) -> String {
+    fn set_command(&self, mut db: std::sync::MutexGuard<Database>) -> String {
         let key = self.args[0].clone();
         let value = self.args[1].clone();
         let mut expire_at = None;
@@ -48,7 +45,7 @@ impl Command {
             };
         }
 
-        db.insert(
+        db.data.insert(
             key,
             Value {
                 val: value,
@@ -59,8 +56,8 @@ impl Command {
         return String::from("+OK\r\n");
     }
 
-    fn get_command(&self, db: std::sync::MutexGuard<HashMap<String, Value>>) -> String {
-        let value = db.get(&self.args[0]);
+    fn get_command(&self, db: std::sync::MutexGuard<Database>) -> String {
+        let value = db.data.get(&self.args[0]);
         if value.is_none() {
             return null_bulk_string_encode();
         }
@@ -73,6 +70,17 @@ impl Command {
 
         if value.expire_at.unwrap() > Utc::now() {
             return simple_string_encode(&value.val);
+        }
+
+        return null_bulk_string_encode();
+    }
+
+    fn config_command(&self, db: std::sync::MutexGuard<Database>) -> String {
+        let key = &self.args[1];
+        let value = db.config.get(key);
+
+        if let Some(value) = value {
+            return array_string_encode(vec![key, value]);
         }
 
         return null_bulk_string_encode();

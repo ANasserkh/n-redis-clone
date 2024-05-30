@@ -1,32 +1,39 @@
 use lazy_static::lazy_static;
 use resp::decoder::decode;
 use std::{
-    collections::HashMap,
     io::{Read, Write},
     net::{TcpListener, TcpStream},
     sync::Mutex,
     vec,
 };
 
-use chrono::{DateTime, Utc};
+use clap::Parser;
+use database::Database;
 use thread_pool::ThreadPool;
 mod command;
+mod database;
 mod thread_pool;
 mod resp {
     pub mod decoder;
     pub mod encoder;
 }
 
-pub struct Value {
-    pub val: String,
-    pub expire_at: Option<DateTime<Utc>>,
+#[derive(Parser, Debug)]
+pub struct Args {
+    #[arg(long)]
+    dir: Option<String>,
+
+    #[arg(long)]
+    dbfilename: Option<String>,
 }
 
 lazy_static! {
-    static ref DB: Mutex<HashMap<String, Value>> = Mutex::new(HashMap::<String, Value>::new());
+    static ref DB: Mutex<Database> = Mutex::new(Database::new());
 }
+
 fn main() {
-    println!("Logs from your program will appear here!");
+    let args = Args::parse();
+    handle_config(args, DB.lock().unwrap());
 
     let listener = TcpListener::bind("127.0.0.1:6379").unwrap();
     let pool = ThreadPool::new(8);
@@ -39,6 +46,15 @@ fn main() {
                 println!("error: {}", e);
             }
         }
+    }
+}
+
+fn handle_config(args: Args, mut db: std::sync::MutexGuard<Database>) {
+    if let Some(dir) = args.dir {
+        db.config.insert("dir".to_string(), dir);
+    }
+    if let Some(dbfilename) = args.dbfilename {
+        db.config.insert("dbfilename".to_string(), dbfilename);
     }
 }
 
@@ -63,7 +79,7 @@ fn handle_connection(mut stream: TcpStream) {
 
 fn handle_command(
     req: String,
-    db: std::sync::MutexGuard<HashMap<String, Value>>,
+    db: std::sync::MutexGuard<Database>,
 ) -> Result<String, anyhow::Error> {
     let cmd = decode(&req)?;
     cmd.execute(db)
