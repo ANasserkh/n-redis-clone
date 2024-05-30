@@ -18,6 +18,7 @@ impl Command {
             "set" => Ok(self.set_command(db)),
             "get" => Ok(self.get_command(db)),
             "config" => Ok(self.config_command(db)),
+            "keys" => Ok(self.keys_command(db)),
             _ => return Err(anyhow!("Command is not recognized {}", self.name)),
         }
     }
@@ -83,6 +84,15 @@ impl Command {
             return array_string_encode(vec![key, value]);
         }
 
+        return null_bulk_string_encode();
+    }
+
+    fn keys_command(&self, db: std::sync::MutexGuard<Database>) -> String {
+        let pattern = &self.args[0];
+        if pattern == "*" {
+            let keys = db.config.keys().collect::<Vec<&String>>();
+            return array_string_encode(keys);
+        }
         return null_bulk_string_encode();
     }
 }
