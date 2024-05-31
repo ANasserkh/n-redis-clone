@@ -12,6 +12,7 @@ use database::Database;
 use thread_pool::ThreadPool;
 mod command;
 mod database;
+mod parser;
 mod thread_pool;
 mod resp {
     pub mod decoder;
@@ -34,7 +35,12 @@ lazy_static! {
 fn main() {
     let args = Args::parse();
     handle_config(args, DB.lock().unwrap());
-
+    {
+        let mut db = DB.lock().unwrap();
+        if let Some(path) = db.get_path() {
+            let _ = db.restore(path.as_str());
+        }
+    }
     let listener = TcpListener::bind("127.0.0.1:6379").unwrap();
     let pool = ThreadPool::new(8);
     for stream in listener.incoming() {
