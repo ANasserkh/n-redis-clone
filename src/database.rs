@@ -13,7 +13,7 @@ pub struct Database {
 }
 
 use crate::parser::{encode_length, parse_key_value_pair};
-use anyhow::{Ok, Result};
+use anyhow::Result;
 use bytes::{Buf, Bytes};
 use std::fs;
 impl Database {
@@ -30,7 +30,8 @@ impl Database {
         Some(format!("{dir}/{filename}"))
     }
 
-    pub fn restore(&mut self, path: &str) -> Result<u32, anyhow::Error> {
+    pub fn restore(&mut self, path: &str) -> Result<(), anyhow::Error> {
+        println!("path  = {}", path);
         let mut byte_vec = vec![];
         fs::File::open(path)?.read_to_end(&mut byte_vec)?;
         let mut bytes = Bytes::from(byte_vec);
@@ -58,7 +59,7 @@ impl Database {
             );
         }
 
-        return Ok(0);
+        Ok(())
     }
 }
 
@@ -66,7 +67,7 @@ impl Database {
 fn test_import() {
     let mut db = Database::new();
     let _result = db
-        .restore("D:/Learning/codecrafters-redis-rust/src/tempdump.rdb")
+        .restore("D:/Learning/codecrafters-redis-rust/src/temp/dump.rdb")
         .unwrap();
 
     assert_eq!(db.data.get("key1").unwrap().val, "value1".to_string());

@@ -38,7 +38,7 @@ fn main() -> Result<(), anyhow::Error> {
     {
         let mut db = DB.lock().unwrap();
         if let Some(path) = db.get_path() {
-            let _ = db.restore(path.as_str())?;
+            let _ = db.restore(path.as_str());
         }
     }
     let listener = TcpListener::bind("127.0.0.1:6379").unwrap();
