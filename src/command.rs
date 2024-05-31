@@ -90,7 +90,7 @@ impl Command {
     fn keys_command(&self, db: std::sync::MutexGuard<Database>) -> String {
         let pattern = &self.args[0];
         if pattern == "*" {
-            let keys = db.config.keys().collect::<Vec<&String>>();
+            let keys = db.data.keys().collect::<Vec<&String>>();
             return array_string_encode(keys);
         }
         return null_bulk_string_encode();
