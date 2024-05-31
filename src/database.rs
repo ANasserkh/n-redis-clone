@@ -5,6 +5,7 @@ use chrono::{DateTime, Utc};
 pub struct Value {
     pub val: String,
     pub expire_at: Option<DateTime<Utc>>,
+    pub r#type: String,
 }
 
 pub struct Database {
@@ -68,6 +69,7 @@ impl Database {
                 Value {
                     val: value,
                     expire_at,
+                    r#type: String::from("string"),
                 },
             );
         }

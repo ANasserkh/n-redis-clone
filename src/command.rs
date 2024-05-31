@@ -1,8 +1,12 @@
+use std::sync::{Mutex, MutexGuard};
+
 use chrono::{Duration, Utc};
 
 use crate::{
     database::{Database, Value},
-    resp::encoder::{array_string_encode, null_bulk_string_encode, simple_string_encode},
+    resp::encoder::{
+        array_string_encode, bulk_string_encode, null_bulk_string_encode, simple_string_encode,
+    },
 };
 use anyhow::anyhow;
 pub struct Command {
@@ -19,6 +23,7 @@ impl Command {
             "get" => Ok(self.get_command(db)),
             "config" => Ok(self.config_command(db)),
             "keys" => Ok(self.keys_command(db)),
+            "type" => Ok(self.type_command(db)),
             _ => return Err(anyhow!("Command is not recognized {}", self.name)),
         }
     }
@@ -28,7 +33,7 @@ impl Command {
     }
 
     pub fn echo_command(&self) -> String {
-        simple_string_encode(&self.args.join(" "))
+        bulk_string_encode(&self.args.join(" "))
     }
 
     fn set_command(&self, mut db: std::sync::MutexGuard<Database>) -> String {
@@ -51,6 +56,7 @@ impl Command {
             Value {
                 val: value,
                 expire_at: expire_at,
+                r#type: String::from("String"),
             },
         );
 
@@ -66,11 +72,11 @@ impl Command {
         let value = value.unwrap();
 
         if value.expire_at.is_none() {
-            return simple_string_encode(&value.val);
+            return bulk_string_encode(&value.val);
         }
 
         if value.expire_at.unwrap() > Utc::now() {
-            return simple_string_encode(&value.val);
+            return bulk_string_encode(&value.val);
         }
 
         return null_bulk_string_encode();
@@ -80,11 +86,10 @@ impl Command {
         let key = &self.args[1];
         let value = db.config.get(key);
 
-        if let Some(value) = value {
-            return array_string_encode(vec![key, value]);
+        match value {
+            None => null_bulk_string_encode(),
+            Some(v) => array_string_encode(vec![key, v]),
         }
-
-        return null_bulk_string_encode();
     }
 
     fn keys_command(&self, db: std::sync::MutexGuard<Database>) -> String {
@@ -95,4 +100,51 @@ impl Command {
         }
         return null_bulk_string_encode();
     }
+
+    fn type_command(&self, db: std::sync::MutexGuard<Database>) -> String {
+        let key = &self.args[0];
+        let value = db.data.get(key);
+
+        match value {
+            None => simple_string_encode(&String::from("none")),
+            Some(v) => simple_string_encode(&v.r#type),
+        }
+    }
+}
+
+#[test]
+fn test_key_command() {
+    let mut db = Database::new();
+    let _result = db
+        .restore("D:/Learning/codecrafters-redis-rust/src/temp/dump.rdb")
+        .unwrap();
+    let cmd = Command {
+        name: String::from("type"),
+        args: vec![String::from("key1")],
+    };
+
+    let db: Mutex<Database> = Mutex::new(db);
+    let db = db.lock().unwrap();
+    let result = cmd.execute(db).unwrap();
+
+    assert_eq!(result, simple_string_encode(&"string".to_string()))
+}
+
+
+#[test]
+fn test_key_command_missing_key() {
+    let mut db = Database::new();
+    let _result = db
+        .restore("D:/Learning/codecrafters-redis-rust/src/temp/dump.rdb")
+        .unwrap();
+    let cmd = Command {
+        name: String::from("type"),
+        args: vec![String::from("missing_key")],
+    };
+
+    let db: Mutex<Database> = Mutex::new(db);
+    let db = db.lock().unwrap();
+    let result = cmd.execute(db).unwrap();
+
+    assert_eq!(result, simple_string_encode(&"none".to_string()))
 }

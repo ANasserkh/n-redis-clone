@@ -1,4 +1,8 @@
 pub fn simple_string_encode(txt: &String) -> String {
+    format!("+{}\r\n", txt)
+}
+
+pub fn bulk_string_encode(txt: &String) -> String {
     format!("${}\r\n{}\r\n", txt.len(), txt)
 }
 
@@ -6,7 +10,7 @@ pub fn array_string_encode(txt: Vec<&String>) -> String {
     let len = txt.len();
     let txt = txt
         .into_iter()
-        .map(|f| simple_string_encode(f))
+        .map(|f| bulk_string_encode(f))
         .collect::<String>();
     format!("*{}\r\n{}", len, txt)
 }
