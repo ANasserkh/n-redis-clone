@@ -1,4 +1,6 @@
-use std::sync::{Mutex, MutexGuard};
+use std::collections::HashMap;
+#[allow(unused)]
+use std::sync::Mutex;
 
 use chrono::{Duration, Utc};
 
@@ -15,7 +17,10 @@ pub struct Command {
 }
 
 impl Command {
-    pub fn execute(&self, db: std::sync::MutexGuard<Database>) -> Result<String, anyhow::Error> {
+    pub fn execute(
+        &mut self,
+        db: std::sync::MutexGuard<Database>,
+    ) -> Result<String, anyhow::Error> {
         match self.name.to_lowercase().as_str() {
             "ping" => Ok(self.ping_command()),
             "echo" => Ok(self.echo_command()),
@@ -24,6 +29,7 @@ impl Command {
             "config" => Ok(self.config_command(db)),
             "keys" => Ok(self.keys_command(db)),
             "type" => Ok(self.type_command(db)),
+            "xadd" => Ok(self.xadd_command(db)),
             _ => return Err(anyhow!("Command is not recognized {}", self.name)),
         }
     }
@@ -57,6 +63,7 @@ impl Command {
                 val: value,
                 expire_at: expire_at,
                 r#type: String::from("string"),
+                entries: None,
             },
         );
 
@@ -110,41 +117,115 @@ impl Command {
             Some(v) => simple_string_encode(&v.r#type),
         }
     }
+
+    fn xadd_command(&mut self, mut db: std::sync::MutexGuard<Database>) -> String {
+        let mut iter = self.args.iter_mut();
+        let stream_key = iter.next().unwrap().clone();
+        let id = iter.next().unwrap();
+        let mut entries = HashMap::new();
+
+        while iter.len() > 0 {
+            let key = iter.next().unwrap().clone();
+            let value = iter.next().unwrap().clone();
+            entries.insert(key, value);
+        }
+
+        let value = Value {
+            r#type: String::from("stream"),
+            expire_at: None,
+            entries: Some(entries),
+            val: id.clone(),
+        };
+        db.data.insert(stream_key, value);
+
+        bulk_string_encode(id)
+    }
 }
 
-#[test]
-fn test_key_command() {
-    let mut db = Database::new();
-    let _result = db
-        .restore("D:/Learning/codecrafters-redis-rust/src/temp/dump.rdb")
-        .unwrap();
-    let cmd = Command {
-        name: String::from("type"),
-        args: vec![String::from("key1")],
-    };
+#[cfg(test)]
+mod commands_tests {
+    use super::*;
+    #[test]
+    fn test_key_command() {
+        let mut db = Database::new();
+        db.data.insert(
+            String::from("key1"),
+            Value {
+                expire_at: None,
+                r#type: String::from("string"),
+                val: String::from("value1"),
+                entries: None,
+            },
+        );
 
-    let db: Mutex<Database> = Mutex::new(db);
-    let db = db.lock().unwrap();
-    let result = cmd.execute(db).unwrap();
+        let mut cmd = Command {
+            name: String::from("type"),
+            args: vec![String::from("key1")],
+        };
 
-    assert_eq!(result, simple_string_encode(&"string".to_string()))
-}
+        let db: Mutex<Database> = Mutex::new(db);
+        let db = db.lock().unwrap();
+        let result = cmd.execute(db).unwrap();
 
+        assert_eq!(result, simple_string_encode(&"string".to_string()))
+    }
 
-#[test]
-fn test_key_command_missing_key() {
-    let mut db = Database::new();
-    let _result = db
-        .restore("D:/Learning/codecrafters-redis-rust/src/temp/dump.rdb")
-        .unwrap();
-    let cmd = Command {
-        name: String::from("type"),
-        args: vec![String::from("missing_key")],
-    };
+    #[test]
+    fn test_key_command_missing_key() {
+        let mut db = Database::new();
+        db.data.insert(
+            String::from("key1"),
+            Value {
+                expire_at: None,
+                r#type: String::from("string"),
+                val: String::from("value1"),
+                entries: None,
+            },
+        );
+        let mut cmd = Command {
+            name: String::from("type"),
+            args: vec![String::from("missing_key")],
+        };
 
-    let db: Mutex<Database> = Mutex::new(db);
-    let db = db.lock().unwrap();
-    let result = cmd.execute(db).unwrap();
+        let db: Mutex<Database> = Mutex::new(db);
+        let db = db.lock().unwrap();
+        let result = cmd.execute(db).unwrap();
 
-    assert_eq!(result, simple_string_encode(&"none".to_string()))
+        assert_eq!(result, simple_string_encode(&"none".to_string()))
+    }
+
+    #[test]
+    fn test_xadd_command() {
+        let db = Database::new();
+
+        let mut cmd = Command {
+            name: String::from("xadd"),
+            args: vec![
+                "stream_key".to_string(),
+                "0-1".to_string(),
+                "key".to_string(),
+                "value".to_string(),
+            ],
+        };
+
+        let db: Mutex<Database> = Mutex::new(db);
+
+        {
+            let db = db.lock().unwrap();
+            let result = cmd.execute(db).unwrap();
+            assert_eq!(result, bulk_string_encode(&"0-1".to_string()));
+        }
+
+        {
+            let db = db.lock().unwrap();
+
+            let mut cmd = Command {
+                name: String::from("type"),
+                args: vec![String::from("stream_key")],
+            };
+
+            let result = cmd.execute(db).unwrap();
+            assert_eq!(result, simple_string_encode(&"stream".to_string()));
+        }
+    }
 }

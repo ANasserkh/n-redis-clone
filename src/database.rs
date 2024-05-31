@@ -6,6 +6,7 @@ pub struct Value {
     pub val: String,
     pub expire_at: Option<DateTime<Utc>>,
     pub r#type: String,
+    pub entries: Option<HashMap<String, String>>,
 }
 
 pub struct Database {
@@ -70,6 +71,7 @@ impl Database {
                     val: value,
                     expire_at,
                     r#type: String::from("string"),
+                    entries: None,
                 },
             );
         }

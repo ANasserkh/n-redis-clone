@@ -1,5 +1,5 @@
 use bytes::{Buf, Bytes};
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Utc};
 
 pub fn encode_length(start: u8, bytes: &mut Bytes) -> u32 {
     match start {
@@ -36,6 +36,6 @@ pub fn parse_expire_date(duration_type: &u8, bytes: &mut Bytes) -> Option<DateTi
         let milliseconds: i64 = bytes.get_u64_le().try_into().unwrap();
         return Some(DateTime::<Utc>::from_timestamp_millis(milliseconds)?);
     }
-    
+
     None
 }
