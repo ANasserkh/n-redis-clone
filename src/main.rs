@@ -32,13 +32,13 @@ lazy_static! {
     static ref DB: Mutex<Database> = Mutex::new(Database::new());
 }
 
-fn main() {
+fn main() -> Result<(), anyhow::Error> {
     let args = Args::parse();
     handle_config(args, DB.lock().unwrap());
     {
         let mut db = DB.lock().unwrap();
         if let Some(path) = db.get_path() {
-            let _ = db.restore(path.as_str());
+            let _ = db.restore(path.as_str())?;
         }
     }
     let listener = TcpListener::bind("127.0.0.1:6379").unwrap();
@@ -53,6 +53,8 @@ fn main() {
             }
         }
     }
+
+    Ok(())
 }
 
 fn handle_config(args: Args, mut db: std::sync::MutexGuard<Database>) {

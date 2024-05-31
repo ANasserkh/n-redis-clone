@@ -27,7 +27,7 @@ impl Database {
     pub fn get_path(&self) -> Option<String> {
         let dir = self.config.get("dir")?;
         let filename = self.config.get("dbfilename")?;
-        Some(format!("{dir}{filename}"))
+        Some(format!("{dir}/{filename}"))
     }
 
     pub fn restore(&mut self, path: &str) -> Result<u32, anyhow::Error> {
@@ -66,7 +66,7 @@ impl Database {
 fn test_import() {
     let mut db = Database::new();
     let _result = db
-        .restore("D:/Learning/codecrafters-redis-rust/src/temp/dump.rdb")
+        .restore("D:/Learning/codecrafters-redis-rust/src/tempdump.rdb")
         .unwrap();
 
     assert_eq!(db.data.get("key1").unwrap().val, "value1".to_string());
