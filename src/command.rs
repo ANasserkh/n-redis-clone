@@ -56,7 +56,7 @@ impl Command {
             Value {
                 val: value,
                 expire_at: expire_at,
-                r#type: String::from("String"),
+                r#type: String::from("string"),
             },
         );
 
