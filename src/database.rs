@@ -12,7 +12,7 @@ pub struct Database {
     pub config: HashMap<String, String>,
 }
 
-use crate::parser::{encode_length, parse_key_value_pair};
+use crate::parser::{encode_length, parse_expire_date, parse_key_value_pair};
 use anyhow::Result;
 use bytes::{Buf, Bytes};
 use std::fs;
@@ -45,16 +45,29 @@ impl Database {
         let expired_length_encode = encode_length(bytes.get_u8(), &mut bytes);
 
         if expired_length_encode != 0 {
-            // get expiry data;
+            0xFD; // in second
+            0xFC; // in millisecond
         }
 
         for _ in 1..=length_encode {
-            let (key, value) = parse_key_value_pair(&mut bytes)?;
+            let expire_at;
+            let value_type;
+            let duration_type = bytes.get_u8();
+
+            if duration_type == 0xFD || duration_type == 0xFC {
+                expire_at = parse_expire_date(&duration_type, &mut bytes);
+                value_type = bytes.get_u8();
+            } else {
+                expire_at = None;
+                value_type = duration_type;
+            }
+
+            let (key, value) = parse_key_value_pair(&value_type, &mut bytes)?;
             self.data.insert(
                 key,
                 Value {
                     val: value,
-                    expire_at: None,
+                    expire_at,
                 },
             );
         }
@@ -69,6 +82,7 @@ fn test_import() {
     let _result = db
         .restore("D:/Learning/codecrafters-redis-rust/src/temp/dump.rdb")
         .unwrap();
-
-    assert_eq!(db.data.get("key1").unwrap().val, "value1".to_string());
+    assert_eq!(db.data.keys().len(), 3);
+    let expired_keys = db.data.get("key_exp").unwrap();
+    assert!(expired_keys.expire_at.is_some());
 }
