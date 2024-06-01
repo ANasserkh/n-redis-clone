@@ -17,10 +17,7 @@ pub struct Command {
 }
 
 impl Command {
-    pub fn execute(
-        &mut self,
-        db: std::sync::MutexGuard<Database>,
-    ) -> Result<String, anyhow::Error> {
+    pub fn execute(&self, db: std::sync::MutexGuard<Database>) -> Result<String, anyhow::Error> {
         match self.name.to_lowercase().as_str() {
             "ping" => Ok(self.ping_command()),
             "echo" => Ok(self.echo_command()),
@@ -118,16 +115,18 @@ impl Command {
         }
     }
 
-    fn xadd_command(&mut self, mut db: std::sync::MutexGuard<Database>) -> String {
-        let mut iter = self.args.iter_mut();
-        let stream_key = iter.next().unwrap().clone();
-        let id = iter.next().unwrap();
+    fn xadd_command(&self, mut db: std::sync::MutexGuard<Database>) -> String {
+        let stream_key = self.args[0].clone();
+        let id = self.args[1].clone();
         let mut entries = HashMap::new();
 
-        while iter.len() > 0 {
-            let key = iter.next().unwrap().clone();
-            let value = iter.next().unwrap().clone();
+        let mut i = 2;
+        while i < self.args.len() {
+            let key = self.args[i].clone();
+            let value = self.args[i + 1].clone();
             entries.insert(key, value);
+
+            i = i + 2;
         }
 
         let value = Value {
@@ -136,9 +135,9 @@ impl Command {
             entries: Some(entries),
             val: id.clone(),
         };
-        db.data.insert(stream_key, value);
 
-        bulk_string_encode(id)
+        db.data.insert(stream_key, value);
+        bulk_string_encode(&id)
     }
 }
 
@@ -158,7 +157,7 @@ mod commands_tests {
             },
         );
 
-        let mut cmd = Command {
+        let cmd = Command {
             name: String::from("type"),
             args: vec![String::from("key1")],
         };
@@ -182,7 +181,7 @@ mod commands_tests {
                 entries: None,
             },
         );
-        let mut cmd = Command {
+        let cmd = Command {
             name: String::from("type"),
             args: vec![String::from("missing_key")],
         };
@@ -198,7 +197,7 @@ mod commands_tests {
     fn test_xadd_command() {
         let db = Database::new();
 
-        let mut cmd = Command {
+        let cmd = Command {
             name: String::from("xadd"),
             args: vec![
                 "stream_key".to_string(),
@@ -219,7 +218,7 @@ mod commands_tests {
         {
             let db = db.lock().unwrap();
 
-            let mut cmd = Command {
+            let cmd = Command {
                 name: String::from("type"),
                 args: vec![String::from("stream_key")],
             };

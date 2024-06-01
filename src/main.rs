@@ -89,6 +89,6 @@ fn handle_command(
     req: String,
     db: std::sync::MutexGuard<Database>,
 ) -> Result<String, anyhow::Error> {
-    let mut cmd = decode(&req)?;
+    let cmd = decode(&req)?;
     cmd.execute(db)
 }
